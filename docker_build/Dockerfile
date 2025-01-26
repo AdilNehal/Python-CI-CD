@@ -1,13 +1,19 @@
-FROM jenkins/inbound-agent:latest
+# Base image for Jenkins agent
+FROM jenkins/inbound-agent:latest AS base
 USER root
 
+# Install necessary tools
 RUN apt-get update && \
     apt-get install -y curl groovy python3 && \
-    curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh -o /tmp/install.sh && \
-    chmod +x /tmp/install.sh && \
-    /tmp/install.sh && \
-    curl https://get.docker.com/builds/Linux/x86_64/docker-latest.tgz | tar xvz -C /tmp/ && \
+    curl -fsSL https://get.docker.com/builds/Linux/x86_64/docker-latest.tgz | tar xvz -C /tmp/ && \
     mv /tmp/docker/docker /usr/bin/docker && \
     apt-get clean
+
+# Final image with Trivy
+FROM base
+USER root
+
+# Install Trivy
+RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
 USER jenkins

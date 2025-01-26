@@ -1,7 +1,7 @@
 podTemplate(containers: [
     containerTemplate(
         name: 'jnlp', 
-        image: 'adil22/jenkins-agent-groovy:18125-v7'
+        image: 'adil22/jenkins-agent-groovy:18125-v9'
         )
     ],
     volumes: [
@@ -33,6 +33,10 @@ podTemplate(containers: [
                 buildDockerImage(dockerimagename)
             }
 
+            stage('Trivy Scan Image') {
+                trivyScanImage(dockerimagename)
+            }
+
             stage('Pushing Image') {
                 pushDockerImage(registryCredential)
             }
@@ -60,6 +64,7 @@ def pushDockerImage(registryCredential) {
     }
 }
 
+// Function to run SonarQube code analysis
 def sonarqubeCheck(scannerName, scannerURL) {
     def scannerHome = tool name: scannerName, type: 'hudson.plugins.sonar.SonarRunnerInstallation'
     withSonarQubeEnv('sonarqube') {
@@ -71,5 +76,20 @@ def sonarqubeCheck(scannerName, scannerURL) {
             -D sonar.sourceEncoding=UTF-8 \
             -D sonar.language=python \
             -D sonar.host.url=${scannerURL}"
+    }
+}
+
+// Function to run Trivy scan on the Docker image
+def trivyScanImage(dockerimagename) {
+    def trivyOutput = sh(script: "trivy image ${dockerimagename}", returnStdout: true).trim()
+    println trivyOutput
+    if (trivyOutput.contains("Total: 0")) {
+        echo "No vulnerabilities found in the Docker image."
+    }
+    else {
+        error "Vulnerabilities found in the Docker image."
+        // You can take further actions here based on your requirements
+        // For example, failing the build if vulnerabilities are found
+        // error "Vulnerabilities found in the Docker image."
     }
 }
