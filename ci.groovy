@@ -1,19 +1,32 @@
 podTemplate(containers: [
     containerTemplate(
         name: 'jnlp', 
-        image: 'adil22/jenkins-agent-groovy:18125-v5'
+        image: 'adil22/jenkins-agent-groovy:18125-v7'
         )
-  ]) {
+    ],
+    volumes: [
+        hostPathVolume(mountPath: '/var/run/docker.sock', hostPath: '/var/run/docker.sock')
+    ]
+    ) 
+  {
 
     node(POD_LABEL) {
 
         def dockerimagename = "adil22/python-app:${currentBuild.number}"
         def PAT = credentials('github')
         def registryCredential = 'dockerhub'
+        def scannerName = 'quality-check'
+        def scannerURL = 'http://quality-sonarqube.ci.svc.cluster.local:9000'
 
         container('jnlp') {
             stage('Checkout Source') {
                 checkoutSource()
+            }
+
+            stage('SonarQube Code Analysis') {
+                dir("${WORKSPACE}"){
+                    sonarqubeCheck(scannerName, scannerURL)
+                }
             }
 
             stage('Build image') {
@@ -21,7 +34,7 @@ podTemplate(containers: [
             }
 
             stage('Pushing Image') {
-                pushDockerImage(dockerimagename)
+                pushDockerImage(registryCredential)
             }
         }
 
@@ -41,8 +54,22 @@ def buildDockerImage(dockerimagename) {
 }
 
 // Function to push the Docker image to DockerHub
-def pushDockerImage(dockerimagename) {
-    docker.withRegistry('https://registry.hub.docker.com', env.registryCredential) {
-        dockerImage.push(dockerimagename)
+def pushDockerImage(registryCredential) {
+    docker.withRegistry('https://registry.hub.docker.com', registryCredential) {
+        dockerImage.push("${currentBuild.number}")
+    }
+}
+
+def sonarqubeCheck(scannerName, scannerURL) {
+    def scannerHome = tool name: scannerName, type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+    withSonarQubeEnv('sonarqube') {
+        sh "${scannerHome}/bin/sonar-scanner \
+            -D sonar.projectVersion=1.0-SNAPSHOT \
+            -D sonar.qualityProfile='Sonar way' \
+            -D sonar.projectBaseDir=${WORKSPACE} \
+            -D sonar.projectKey=python-sample-app \
+            -D sonar.sourceEncoding=UTF-8 \
+            -D sonar.language=python \
+            -D sonar.host.url=${scannerURL}"
     }
 }
