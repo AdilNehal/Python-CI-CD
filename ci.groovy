@@ -42,7 +42,7 @@ podTemplate(containers: [
             }
 
             stage('Updating the Helm Chart') {
-                setImageTagInHelmChart(imageTag)
+                setImageTagInHelmChart("${currentBuild.number}")
             }
 
         }
@@ -99,12 +99,15 @@ podTemplate(containers: [
 
     // Function to update the Helm chart with the new Docker image tag
     def setImageTagInHelmChart(imageTag) {
+        withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
+            git branch: 'main', credentialsId: 'github', url: "http://${env.PAT}@github.com/AdilNehal/Python-CI-CD.git"
+        }
         sh"""
             cd ${WORKSPACE}/helm-charts-deployments/python-app
             sed -i "s|tag:.*|tag: \"$imageTag\"|" values.yaml
             git add -A
             git commit -m "Updated the Docker image tag: \${imageTag} in Helm chart"
-            git push
+            git push -u origin main
         """
     }
 }
