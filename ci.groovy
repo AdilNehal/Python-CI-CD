@@ -40,56 +40,72 @@ podTemplate(containers: [
             stage('Pushing Image') {
                 pushDockerImage(registryCredential)
             }
+
+            stage('Updating the Helm Chart') {
+                setImageTagInHelmChart(imageTag)
+            }
+
         }
+    }
 
+    // Function to checkout source code
+    def checkoutSource() {
+        withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
+            git branch: 'main', credentialsId: 'github', url: "http://${env.PAT}@github.com/AdilNehal/Python-CI-CD.git"
+        }
+    }
+
+    // Function to build the Docker image
+    def buildDockerImage(dockerimagename) {
+        dockerImage = docker.build(dockerimagename)
+    }
+
+    // Function to push the Docker image to DockerHub
+    def pushDockerImage(registryCredential) {
+        docker.withRegistry('https://registry.hub.docker.com', registryCredential) {
+            dockerImage.push("${currentBuild.number}")
+        }
+    }
+
+    // Function to run SonarQube code analysis
+    def sonarqubeCheck(scannerName, scannerURL) {
+        def scannerHome = tool name: scannerName, type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+        withSonarQubeEnv('sonarqube') {
+            sh "${scannerHome}/bin/sonar-scanner \
+                -D sonar.projectVersion=1.0-SNAPSHOT \
+                -D sonar.qualityProfile='Sonar way' \
+                -D sonar.projectBaseDir=${WORKSPACE} \
+                -D sonar.projectKey=python-sample-app \
+                -D sonar.sourceEncoding=UTF-8 \
+                -D sonar.language=python \
+                -D sonar.host.url=${scannerURL}"
+        }
+    }
+
+    // Function to run Trivy scan on the Docker image
+    def trivyScanImage(dockerimagename) {
+        def trivyOutput = sh(script: "trivy image ${dockerimagename}", returnStdout: true).trim()
+        println trivyOutput
+        if (trivyOutput.contains("Total: 0")) {
+            echo "No vulnerabilities found in the Docker image."
+        }
+        else {
+            error "Vulnerabilities found in the Docker image."
+            // You can take further actions here based on your requirements
+            // For example, failing the build if vulnerabilities are found
+            // error "Vulnerabilities found in the Docker image."
+        }
+    }
+
+    // Function to update the Helm chart with the new Docker image tag
+    def setImageTagInHelmChart(imageTag) {
+        sh"""
+            cd ${WORKSPACE}/helm-charts-deployments/python-app
+            sed -i "s|tag:.*|tag: \"$imageTag\"|" values.yaml
+            git add -A
+            git commit -m "Updated the Docker image tag: \${imageTag} in Helm chart"
+            git push
+        """
     }
 }
-
-// Function to checkout source code
-def checkoutSource() {
-    withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
-        git branch: 'main', credentialsId: 'github', url: "http://${env.PAT}@github.com/AdilNehal/Python-CI-CD.git"
-    }
-}
-
-// Function to build the Docker image
-def buildDockerImage(dockerimagename) {
-    dockerImage = docker.build(dockerimagename)
-}
-
-// Function to push the Docker image to DockerHub
-def pushDockerImage(registryCredential) {
-    docker.withRegistry('https://registry.hub.docker.com', registryCredential) {
-        dockerImage.push("${currentBuild.number}")
-    }
-}
-
-// Function to run SonarQube code analysis
-def sonarqubeCheck(scannerName, scannerURL) {
-    def scannerHome = tool name: scannerName, type: 'hudson.plugins.sonar.SonarRunnerInstallation'
-    withSonarQubeEnv('sonarqube') {
-        sh "${scannerHome}/bin/sonar-scanner \
-            -D sonar.projectVersion=1.0-SNAPSHOT \
-            -D sonar.qualityProfile='Sonar way' \
-            -D sonar.projectBaseDir=${WORKSPACE} \
-            -D sonar.projectKey=python-sample-app \
-            -D sonar.sourceEncoding=UTF-8 \
-            -D sonar.language=python \
-            -D sonar.host.url=${scannerURL}"
-    }
-}
-
-// Function to run Trivy scan on the Docker image
-def trivyScanImage(dockerimagename) {
-    def trivyOutput = sh(script: "trivy image ${dockerimagename}", returnStdout: true).trim()
-    println trivyOutput
-    if (trivyOutput.contains("Total: 0")) {
-        echo "No vulnerabilities found in the Docker image."
-    }
-    else {
-        error "Vulnerabilities found in the Docker image."
-        // You can take further actions here based on your requirements
-        // For example, failing the build if vulnerabilities are found
-        // error "Vulnerabilities found in the Docker image."
-    }
-}
+ 
