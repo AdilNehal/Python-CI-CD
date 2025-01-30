@@ -1,14 +1,14 @@
 podTemplate(containers: [
     containerTemplate(
         name: 'jnlp', 
-        image: 'adil22/jenkins-agent-groovy:18125-v9'
+        image: 'adil22/jenkins-agent-groovy:18125-v11'
         )
     ],
     volumes: [
         hostPathVolume(mountPath: '/var/run/docker.sock', hostPath: '/var/run/docker.sock')
     ]
     ) 
-  {
+    {
 
     node(POD_LABEL) {
 
@@ -20,7 +20,7 @@ podTemplate(containers: [
 
         container('jnlp') {
             stage('Checkout Source') {
-                checkoutSource()
+                checkoutSource(PAT)
             }
 
             stage('SonarQube Code Analysis') {
@@ -40,75 +40,76 @@ podTemplate(containers: [
             stage('Pushing Image') {
                 pushDockerImage(registryCredential)
             }
-
+            
             stage('Updating the Helm Chart') {
-                setImageTagInHelmChart("${currentBuild.number}")
+                setImageTagInHelmChart(PAT,"${currentBuild.number}")
             }
-
         }
+
     }
+}
 
-    // Function to checkout source code
-    def checkoutSource() {
-        withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
-            git branch: 'main', credentialsId: 'github', url: "http://${env.PAT}@github.com/AdilNehal/Python-CI-CD.git"
-        }
+// Function to checkout source code
+def checkoutSource(PAT) {
+    withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
+        git branch: 'main', credentialsId: 'github', url: "http://${PAT}@github.com/AdilNehal/Python-CI-CD.git"
     }
+}
 
-    // Function to build the Docker image
-    def buildDockerImage(dockerimagename) {
-        dockerImage = docker.build(dockerimagename)
+// Function to build the Docker image
+def buildDockerImage(dockerimagename) {
+    dockerImage = docker.build(dockerimagename)
+}
+
+// Function to push the Docker image to DockerHub
+def pushDockerImage(registryCredential) {
+    docker.withRegistry('https://registry.hub.docker.com', registryCredential) {
+        dockerImage.push("${currentBuild.number}")
     }
+}
 
-    // Function to push the Docker image to DockerHub
-    def pushDockerImage(registryCredential) {
-        docker.withRegistry('https://registry.hub.docker.com', registryCredential) {
-            dockerImage.push("${currentBuild.number}")
-        }
+// Function to run SonarQube code analysis
+def sonarqubeCheck(scannerName, scannerURL) {
+    def scannerHome = tool name: scannerName, type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+    withSonarQubeEnv('sonarqube') {
+        sh "${scannerHome}/bin/sonar-scanner \
+            -D sonar.projectVersion=1.0-SNAPSHOT \
+            -D sonar.qualityProfile='Sonar way' \
+            -D sonar.projectBaseDir=${WORKSPACE} \
+            -D sonar.projectKey=python-sample-app \
+            -D sonar.sourceEncoding=UTF-8 \
+            -D sonar.language=python \
+            -D sonar.host.url=${scannerURL}"
     }
+}
 
-    // Function to run SonarQube code analysis
-    def sonarqubeCheck(scannerName, scannerURL) {
-        def scannerHome = tool name: scannerName, type: 'hudson.plugins.sonar.SonarRunnerInstallation'
-        withSonarQubeEnv('sonarqube') {
-            sh "${scannerHome}/bin/sonar-scanner \
-                -D sonar.projectVersion=1.0-SNAPSHOT \
-                -D sonar.qualityProfile='Sonar way' \
-                -D sonar.projectBaseDir=${WORKSPACE} \
-                -D sonar.projectKey=python-sample-app \
-                -D sonar.sourceEncoding=UTF-8 \
-                -D sonar.language=python \
-                -D sonar.host.url=${scannerURL}"
-        }
+// Function to run Trivy scan on the Docker image
+def trivyScanImage(dockerimagename) {
+    def trivyOutput = sh(script: "trivy image ${dockerimagename}", returnStdout: true).trim()
+    println trivyOutput
+    if (trivyOutput.contains("Total: 0")) {
+        echo "No vulnerabilities found in the Docker image."
     }
-
-    // Function to run Trivy scan on the Docker image
-    def trivyScanImage(dockerimagename) {
-        def trivyOutput = sh(script: "trivy image ${dockerimagename}", returnStdout: true).trim()
-        println trivyOutput
-        if (trivyOutput.contains("Total: 0")) {
-            echo "No vulnerabilities found in the Docker image."
-        }
-        else {
-            error "Vulnerabilities found in the Docker image."
-            // You can take further actions here based on your requirements
-            // For example, failing the build if vulnerabilities are found
-            // error "Vulnerabilities found in the Docker image."
-        }
+    else {
+        error "Vulnerabilities found in the Docker image."
+        // You can take further actions here based on your requirements
+        // For example, failing the build if vulnerabilities are found
+        // error "Vulnerabilities found in the Docker image."
     }
+}
 
-    // Function to update the Helm chart with the new Docker image tag
-    def setImageTagInHelmChart(imageTag) {
-        withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
-            git branch: 'main', credentialsId: 'github', url: "http://${env.PAT}@github.com/AdilNehal/Python-CI-CD.git"
-        }
-        sh"""
-            cd ${WORKSPACE}/helm-charts-deployments/python-app
-            sed -i "s|tag:.*|tag: \"$imageTag\"|" values.yaml
+// Function to update the Helm chart with the new Docker image tag
+def setImageTagInHelmChart(PAT, imageTag) {
+    withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
+        sh """
+            git clone https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/AdilNehal/Python-CI-CD.git
+            cd Python-CI-CD/helm-charts-deployment/python-app
+            git config user.email "adilnehal2000@gmail.com"
+            git config user.name "AdilNehal"
+            sed -i "s|tag:.*|tag: \\\"$imageTag\\\"|" values.yaml
             git add -A
-            git commit -m "Updated the Docker image tag: \${imageTag} in Helm chart"
-            git push -u origin main
+            git commit -m "Updated the Docker image tag: $imageTag in Helm chart"
+            git push origin main
         """
     }
 }
- 
