@@ -12,6 +12,8 @@ podTemplate(containers: [
 
     node(POD_LABEL) {
 
+        properties([pipelineTriggers([[$class: 'GitHubPushTrigger'], pollSCM('H/15 * * * *')])])
+
         def dockerimagename = "adil22/python-app:${currentBuild.number}"
         def PAT = credentials('github')
         def registryCredential = 'dockerhub'
