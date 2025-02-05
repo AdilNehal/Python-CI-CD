@@ -106,8 +106,7 @@ def setImageTagInHelmChart(PAT, imageTag) {
         sh """
             git clone https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/AdilNehal/Python-CI-CD.git
             cd Python-CI-CD/helm-charts-deployment/python-app
-            git config user.email "adilnehal2000@gmail.com"
-            git config user.name "AdilNehal"
+            git config --global user.email ci-bot@argocd.com && git config --global user.name ci-bot
             sed -i "s|tag:.*|tag: \\\"$imageTag\\\"|" values.yaml
             git add -A
             git commit -m "Updated the Docker image tag: $imageTag in Helm chart"
