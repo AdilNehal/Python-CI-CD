@@ -1,20 +1,21 @@
 #!/usr/bin/python
 
-import time
-from flask import Flask
-app = Flask(__name__)
+import http.server
+from prometheus_client import start_http_server
 
-START = time.time()
+APP_PORT = 8081
+METRICS_PORT = 8001
 
-def elapsed():
-    running = time.time() - START
-    minutes, seconds = divmod(running, 60)
-    hours, minutes = divmod(minutes, 60)
-    return "%d:%02d:%02d" % (hours, minutes, seconds)
+class HandleRequests(http.server.BaseHTTPRequestHandler):
 
-@app.route('/')
-def root():
-    return "Hello World (Adil)! (up %s)\n" % elapsed()
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+        self.wfile.write(bytes("<html><head><title>First Application</title></head><body style='color: #333; margin-top: 30px;'><center><h2>Welcome to our first Prometheus-Python application.</center></h2></body></html>", "utf-8"))
+        self.wfile.close()
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=8081)
+    start_http_server(METRICS_PORT)
+    server = http.server.HTTPServer(('localhost', APP_PORT), HandleRequests)
+    server.serve_forever()
