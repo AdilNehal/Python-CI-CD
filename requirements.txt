@@ -1,3 +1,1 @@
 prometheus_client
-curl
-netstat
