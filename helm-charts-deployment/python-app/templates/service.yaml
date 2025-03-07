@@ -12,7 +12,9 @@ spec:
   type: {{ .Values.service.type }}
   ports:
     {{- range .Values.service.portsSettings }}
-    - {{ . }}
+    - name: {{ .name }}
+      port: {{ .port }}
+      targetPort: {{ .targetPort }}
     {{- end }}
   selector:
     {{- include "python-app.selectorLabels" . | nindent 4 }}
