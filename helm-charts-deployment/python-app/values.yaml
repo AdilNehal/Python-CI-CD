@@ -56,7 +56,13 @@ service:
   # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
   type: NodePort
   # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
-  port: 8081
+  portsSettings: 
+    - name: servicePort
+      port: 8081
+      targetPort: 8081
+    - name: metricsPort
+      port: 8001
+      targetPort: 8001
 
 # This block is for setting up the ingress for more information can be found here: https://kubernetes.io/docs/concepts/services-networking/ingress/
 ingress:
