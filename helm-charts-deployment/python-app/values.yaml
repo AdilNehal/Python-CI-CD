@@ -57,10 +57,10 @@ service:
   type: NodePort
   # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
   portsSettings: 
-    - name: servicePort
+    - name: serviceport
       port: 8081
       targetPort: 8081
-    - name: metricsPort
+    - name: metricsport
       port: 8001
       targetPort: 8001
 
