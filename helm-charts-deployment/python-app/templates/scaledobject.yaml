@@ -1,0 +1,18 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: python-deployment-memory
+  namespace: demo
+spec:
+  scaleTargetRef:
+    name: python-app
+  pollingInterval: 50 # Must be seconds
+  minReplicaCount: 1
+  maxReplicaCount: 2
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: http://metrics-prometheus-server.monitoring.svc.cluster.local:9090
+      metricName: pod_memory_percentage_usage_pyhton
+      threshold: '80'
+      query: sum(round(max by (pod) (max_over_time(container_memory_usage_bytes{namespace="demo",pod=~"python-app.*",container="python-app"}[1m])) / on (pod)(max by (pod) (kube_pod_container_resource_limits{namespace="demo",pod=~"python-app.*",container="python-app",resource="memory"})) * 100,0.01))
