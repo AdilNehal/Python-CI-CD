@@ -12,7 +12,7 @@ podTemplate(containers: [
 
     node(POD_LABEL) {
         //set github webhook before setting this
-        properties([pipelineTriggers([[$class: 'GitHubPushTrigger'], pollSCM('H/15 * * * *')])])
+        // properties([pipelineTriggers([[$class: 'GitHubPushTrigger'], pollSCM('H/15 * * * *')])])
 
         def dockerimagename = "adil22/python-app:${currentBuild.number}"
         def PAT = credentials('github')
