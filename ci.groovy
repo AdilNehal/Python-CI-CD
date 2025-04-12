@@ -78,7 +78,7 @@ def sonarqubeCheck(scannerName, scannerURL) {
             -D sonar.projectVersion=1.0-SNAPSHOT \
             -D sonar.qualityProfile='Sonar way' \
             -D sonar.projectBaseDir=${WORKSPACE} \
-            -D sonar.projectKey=python-sample-app \
+            -D sonar.projectKey=python-app \
             -D sonar.sourceEncoding=UTF-8 \
             -D sonar.language=python \
             -D sonar.host.url=${scannerURL}"
