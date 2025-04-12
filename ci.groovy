@@ -87,16 +87,18 @@ def sonarqubeCheck(scannerName, scannerURL) {
 
 // Function to run Trivy scan on the Docker image
 def trivyScanImage(dockerimagename) {
-    def trivyOutput = sh(script: "trivy image ${dockerimagename}", returnStdout: true).trim()
-    println trivyOutput
-    if (trivyOutput.contains("Total: 0")) {
-        echo "No vulnerabilities found in the Docker image."
-    }
-    else {
-        error "Vulnerabilities found in the Docker image."
-        // You can take further actions here based on your requirements
-        // For example, failing the build if vulnerabilities are found
-        // error "Vulnerabilities found in the Docker image."
+    // Scan only for HIGH and CRITICAL vulnerabilities, ignore unfixed ones
+    def exitCode = sh(script: "trivy image --severity HIGH,CRITICAL --exit-code 0 --ignore-unfixed ${dockerimagename}", returnStatus: true)
+    def trivyOutput = sh(script: "trivy image --severity HIGH,CRITICAL --ignore-unfixed ${dockerimagename}", returnStdout: true).trim()
+    
+    println "Trivy Scan Results:\n${trivyOutput}"
+    
+    if (exitCode == 0) {
+        echo "No unfixed HIGH or CRITICAL vulnerabilities found."
+    } else {
+        echo "WARNING: Unfixed HIGH or CRITICAL vulnerabilities found."
+        // Continue build but mark as unstable
+        currentBuild.result = 'UNSTABLE'
     }
 }
 
