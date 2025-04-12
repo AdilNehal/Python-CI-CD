@@ -17,7 +17,7 @@ podTemplate(containers: [
         def dockerimagename = "adil22/python-app:${currentBuild.number}"
         def PAT = credentials('github')
         def registryCredential = 'dockerhub'
-        def scannerName = 'quality-check'
+        def scannerName = 'sonarqube'
         def scannerURL = 'http://quality-sonarqube.ci.svc.cluster.local:9000'
 
         container('jnlp') {
